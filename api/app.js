@@ -6,6 +6,10 @@ require('dotenv').config()
 const userRoutes = require('./routes/userRoutes')
 const postRoutes = require('./routes/postRoutes')
 
+const {} = require('./middleware/errorMiddleware')
+const { notFound } = require('./middleware/errorMiddleware')
+const { errorHandler } = require('./middleware/errorMiddleware')
+
 // specify the web app port
 const PORT = process.env.PORT || 5500
 
@@ -18,6 +22,9 @@ app.use(cors())
 // setup the routes
 app.use('/api/users', userRoutes)
 app.use('/api/posts', postRoutes)
+
+app.use(notFound)
+app.use(errorHandler)
 
 // connect to mongo db
 /*connect(process.env.MONGO_URI).then(app.listen(PORT, ()=>{ console.log(`app listening on port ${PORT}`); })).catch(err => {console.log(err);

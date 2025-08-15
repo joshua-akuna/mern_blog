@@ -102,16 +102,18 @@ module.exports.changeAvatar = async (req, res, next)=>{
         if(!req.files.avatar){
             return next(new HttpError('Choose a valid image', 422))
         }
-
+        //create parent directory ifit doesn't exist
+        !fs.existsSync(path.join(__dirname, '..', 'uploads')) && fs.mkdirSync(path.join(__dirname, '..', 'uploads'));
         // find user from db
         const user = await User.findById(req.user.id)
         //delete old avatar if it exists
         if (user.avatar){
-            fs.unlink(path.join(__dirname, '..', 'uploads', user.avatar), (err)=> {
+            if(fs.existsSync(path.join(__dirname, '..', 'uploads', user.avatar))){
+                fs.unlink(path.join(__dirname, '..', 'uploads', user.avatar), (err)=> {
                 if (err){
-                    return next(new HttpError('Unknown uploads', 403))
-                }
-            })
+                    return next(new HttpError(err))
+                }})
+            }
         }
 
         const {avatar} = req.files;
@@ -147,11 +149,15 @@ module.exports.changeAvatar = async (req, res, next)=>{
 
 
 
-// ======== EDIT USER DETAILS (from profile)
+// ======== EDIT USER DETAILS (from profile) 
 // POST: api/users/edit-user
 // UNPROTECTED
 module.exports.editUser = async (req, res, next)=>{
-    res.send('Edit User Profile')
+    try {
+        
+    } catch (error) {
+        return next(new HttpError(error))
+    }
 }
 
  

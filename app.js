@@ -27,8 +27,7 @@ app.use(notFound)
 app.use(errorHandler)
 
 // connect to mongo db
-/*connect(process.env.MONGO_URI).then(app.listen(PORT, ()=>{ console.log(`app listening on port ${PORT}`); })).catch(err => {console.log(err);
-}) */
-app.listen(PORT, (req, res)=>{
+connect(process.env.MONGO_URI).then(app.listen(PORT, ()=>{ console.log(`app listening on port ${PORT}`); })).catch(err => {console.log(err);})
+/*app.listen(PORT, (req, res)=>{
     console.log(`app listening on port ${PORT}`);
-})
+})*/

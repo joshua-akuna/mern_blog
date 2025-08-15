@@ -1,10 +1,12 @@
-// ========REGISTER A NEW USER
-// POST: api/users/register
-
 const HttpError = require("../models/errorModel")
 const User = require('../models/userModel')
 const bcrypt = require('bcryptjs')
+const jwt = require('jsonwebtoken')
 
+
+
+// ========REGISTER A NEW USER
+// POST: api/users/register
 // UNPROTECTED
 module.exports.registerUser = async (req, res, next)=>{
     try {
@@ -31,8 +33,7 @@ module.exports.registerUser = async (req, res, next)=>{
         const salt = await bcrypt.genSalt(10)
         const hashedPassword = await bcrypt.hash(password, salt)
         const newUser = await User.create({name, email, password: hashedPassword})
-        res.status(201).json(newUser)
-        
+        res.status(201).json(`New user ${newUser.email} registered`)
     } catch (error) {
         return next(new HttpError('User registration failed.', 422))
     }
@@ -46,7 +47,26 @@ module.exports.registerUser = async (req, res, next)=>{
 // POST: api/users/login
 // UNPROTECTED
 module.exports.loginUser = async (req, res, next)=>{
-    res.send('login registered User')
+    try {
+        const { email, password } = req.body;
+        
+        if(!email || !password) {
+            return next(new HttpError('Fill in all fields', 422))
+        }
+        const user = await User.findOne({email})
+        if(!user){
+            return next(new HttpError('Email not found', 422))
+        }
+        const comparePass = await bcrypt.compare(password, user.password)
+        if (!comparePass){
+            return next(new HttpError('Wrong password', 422))
+        }
+        const {_id: id, name} = user;
+        const token = jwt.sign({id, name}, process.env.JWT_SECRET, {expiresIn: "1d"})
+        res.status(200).json({token, id, name})
+    } catch (error) {
+        return next(new HttpError('Login failed. Please check credentials, 422'))        
+    }
 }
 
 
@@ -56,7 +76,16 @@ module.exports.loginUser = async (req, res, next)=>{
 // GET: api/users/:id
 // PROTECTED
 module.exports.getUserById = async (req, res, next)=>{
-    res.send('Get User')
+    try {
+        const {id} = req.params;
+        const user = await User.findById(id).select('-password')
+        if (!user){
+            return next(new HttpError('User not found', 404))
+        }
+        res.status(200).json(user)
+    } catch (error) {
+        return next(new HttpError('User not found', 404))
+    }
 }
 
 
@@ -68,7 +97,12 @@ module.exports.getUserById = async (req, res, next)=>{
 // POST: api/users/change-avatar
 // PROTECTED
 module.exports.changeAvatar = async (req, res, next)=>{
-    res.send('Change User Avatar')
+    try {
+        console.log(req.files);
+        res.json(req.files)
+    } catch (error) {
+        return next(new HttpError(error))
+    }
 }
 
 
@@ -93,5 +127,10 @@ module.exports.editUser = async (req, res, next)=>{
 // POST: api/users/
 // PROTECTED
 module.exports.getAllUsers = async (req, res, next)=>{
-    res.send('All Users')
+    try {
+         const users = await User.find().select('-password')
+         res.json(users)
+    } catch (error) {
+        return next(new HttpError(error))
+    }
 } 

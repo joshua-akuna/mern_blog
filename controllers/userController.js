@@ -2,8 +2,9 @@ const HttpError = require("../models/errorModel")
 const User = require('../models/userModel')
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
-
-
+const fs = require('fs')
+const path = require('path')
+const {v4: uuid} = require('uuid')
 
 // ========REGISTER A NEW USER
 // POST: api/users/register
@@ -98,8 +99,44 @@ module.exports.getUserById = async (req, res, next)=>{
 // PROTECTED
 module.exports.changeAvatar = async (req, res, next)=>{
     try {
-        console.log(req.files);
-        res.json(req.files)
+        if(!req.files.avatar){
+            return next(new HttpError('Choose a valid image', 422))
+        }
+
+        // find user from db
+        const user = await User.findById(req.user.id)
+        //delete old avatar if it exists
+        if (user.avatar){
+            fs.unlink(path.join(__dirname, '..', 'uploads', user.avatar), (err)=> {
+                if (err){
+                    return next(new HttpError('Unknown uploads', 403))
+                }
+            })
+        }
+
+        const {avatar} = req.files;
+        // check file size
+        if (avatar.size > 500000){
+            return next(new HttpError('Picture should be less than 500kb', 422))
+        }
+
+        // rename files to avoid conflict
+        let fileName
+        fileName = avatar.name
+        let splits = fileName.split('.')
+        let newFileName = splits[0] + uuid() + '.' + splits[splits.length - 1]
+        
+        avatar.mv(path.join(__dirname, '..', 'uploads', newFileName), async(err) => {
+            if (err){
+                return next(new HttpError(err))
+            }
+
+            const updatedAvatar = await User.findByIdAndUpdate(req.user.id, {avatar: newFileName}, {new: true})
+            if(!updatedAvatar){
+                return next(new HttpError('Avatar could not be changed', 422))
+            }
+            res.status(200).json(updatedAvatar)
+        })
     } catch (error) {
         return next(new HttpError(error))
     }

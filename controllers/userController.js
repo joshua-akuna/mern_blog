@@ -154,7 +154,41 @@ module.exports.changeAvatar = async (req, res, next)=>{
 // UNPROTECTED
 module.exports.editUser = async (req, res, next)=>{
     try {
-        
+        const {name, email, currentPassword, newPassword, confirmNewPassword} = req.body;
+        if (!name || !email || !currentPassword || !newPassword) {
+            return next(new HttpError('Fill in all fields', 422))
+        }
+
+        // get user from db
+        const user = await User.findById(req.user.id)
+        if (!user){
+            return next(HttpError('User not found', 403))
+        }
+
+        // ensure new email does not already exists
+        const emailExists = await User.findOne({email})
+        if (emailExists && (emailExists._id != req.user.id)){
+            return next(new HttpError('Email does not belong to user', 422))
+        }
+        // compare current password
+        const validateCurrentPassword = await bcrypt.compare(currentPassword, user.password)
+        if(!validateCurrentPassword) {
+            return next(new HttpError('Invalid current password', 422))
+        }
+
+        // confirm new passwords
+        if (newPassword !== confirmNewPassword){
+            return next(new HttpError('New passwords do not match', 422))
+        }
+
+        // hash new password
+        const salt = await bcrypt.genSalt(10)
+        const hash = await bcrypt.hash(newPassword, salt)
+
+        // update user info in db
+        const newInfo = await User.findByIdAndUpdate(req.user.id, {name, email, password: hash}, {new: true})
+
+        res.status(200).json(newInfo)
     } catch (error) {
         return next(new HttpError(error))
     }

@@ -1,7 +1,7 @@
-const HttpError = require("../models/errorModel")
 const {v4: uuid} = require('uuid')
 const fs = require('fs')
 const path = require('path')
+const HttpError = require("../models/errorModel")
 const Post = require('../models/postModel')
 const User = require('../models/userModel')
 
@@ -107,12 +107,60 @@ module.exports.getPostsByUser = async(req, res, next)=>{
 
 
 // ======================= EDIT POST
-// PATCH: api/posts/post/:id
+// PATCH: api/posts/:id
 // PROTECTED
 module.exports.editPost = async(req, res, next)=>{
     try {
-        
-        res.send('Edit post')
+        let fileName, newFileName, updatedPost;
+        const postId = req.params.id;
+        // get the title category and content of the post
+        let { title, category, content } = req.body;
+        // ReactQuill has a paragraph opening and closing tag
+        // with a break tag in between so there are 11
+        // characters in there already
+        if (!title || !category || content?.length < 12){
+            return next(new HttpError('All fields required.', 422))
+        }
+        // gets the post object for the postId
+        const oldPost = await Post.findById(postId);
+        // checks if the post creator corresponds to the token owner
+        if (oldPost.creator == req.user.id){
+            if(!req.files){
+                // update without thumbnail
+                updatedPost = await Post.findByIdAndUpdate(postId, {title, category, content}, {new: true})
+            } else {
+                // updates user with new thumbnail
+                // check if old thumbnail exists and delete it
+                if(fs.existsSync(path.join(__dirname, '..', 'uploads', oldPost.thumbnail))){
+                    fs.unlink(path.join(__dirname, '..', 'uploads', oldPost.thumbnail), async(err)=> {
+                        if (err){
+                            return next(new HttpError(err))
+                        }
+                    })
+                }
+                //upload new file
+                const {thumbnail} = req.files;
+                // check thumnail size
+                if (thumbnail.size > 2000000){
+                    return next(new HttpError('Thumbnail size must be less than 2mb'));
+                }
+                fileName = thumbnail.name;
+                let splits = fileName.split('.')
+                newFileName = splits[0] + uuid() + '.' + splits[splits.length - 1];
+
+                // move thumnail to the uploads directory
+                thumbnail.mv(path.join(__dirname, '..', 'uploads', newFileName), async(err)=> {
+                    if (err){
+                        return next(new HttpError(err))
+                    }
+                })
+                updatedPost = await Post.findByIdAndUpdate(postId, {title, category, content, thumbnail: newFileName}, {new: true})
+            }
+        }
+        if (!updatedPost){
+            return next(new HttpError('Unable to update post', 400))
+        }
+        return res.status(200).json(updatedPost);
     } catch (error) {
         return next(new HttpError(error))
     }

@@ -6,7 +6,7 @@ const Post = require('../models/postModel')
 const User = require('../models/userModel')
 
 //===========================CREATE A POST
-// POST : api/post
+// POST : api/posts
 // PROTECTED
 module.exports.createPost = async (req, res, next)=>{
     try {
@@ -172,5 +172,32 @@ module.exports.editPost = async(req, res, next)=>{
 // DELETE: api/posts/:id
 // PROTECTED
 module.exports.deletePostById = async(req, res, next)=>{
-    res.send('Dlete Post')
+    try {
+        const postId = req.params.id;
+        if(!postId){
+            return next(new HttpError('Post is unavailable', 400));
+        }
+        const post = await Post.findById(postId);
+        
+        if(post.creator == req.user.id){
+            // delete thumbnail from uploads directory
+            const fileName = post?.thumbnail;
+            fs.unlink(path.join(__dirname, '..', 'uploads', fileName), async(err) =>{
+                if(err){
+                    return next(new HttpError(err))
+                }else {
+                    await Post.findOneAndDelete(postId);
+                    // reduce post count of user by 1
+                    const currentUser = await User.findById(req.user.id);
+                    const userPostCount = currentUser?.posts - 1;
+                    await User.findByIdAndUpdate(req.user.id, {posts: userPostCount});
+                    res.json(`Post ${postId} deleted successfully.`);
+                }
+            })
+        } else {
+            return next(new HttpError('Unable to delete post.'), 403);
+        }
+    } catch (error) {
+        return next(new HttpError(error))
+    }
 }
